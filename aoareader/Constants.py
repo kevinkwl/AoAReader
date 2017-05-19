@@ -1,0 +1,5 @@
+PAD = 0
+UNK = 1
+
+PAD_WORD = "<PAD>"
+UNK_WORD = "<UNK>"
