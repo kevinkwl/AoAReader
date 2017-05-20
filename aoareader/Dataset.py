@@ -54,6 +54,10 @@ class Dataset(object):
             self.querys[index*self.batch_size:(index+1)*self.batch_size],
             align_right=False, include_lengths=True)
 
+        candidates = self._batchify(
+            self.candidates[index*self.batch_size:(index+1)*self.batch_size],
+            align_right=False, include_lengths=False)
+
         if self.answers is not None:
             answers = torch.LongTensor(self.answers[index*self.batch_size:(index+1)*self.batch_size])
         else:
@@ -73,8 +77,11 @@ class Dataset(object):
         doc_lengths = torch.LongTensor(doc_lengths)
 
         q_lengths = torch.LongTensor(q_lengths)
+        if self.cuda:
+            doc_lengths.cuda()
+            q_lengths.cuda()
 
-        return (wrap(documents), doc_lengths), (wrap(querys), q_lengths), wrap(answers)
+        return (wrap(documents), doc_lengths), (wrap(querys), q_lengths), wrap(answers), wrap(candidates)
 
     def __len__(self):
         return self.numBatches
