@@ -9,6 +9,13 @@ from torch.autograd import Variable
 import aoareader
 
 
+def create_mask(seq_lens):
+    mask = torch.zeros(len(seq_lens), torch.max(seq_lens))
+    for i, seq_len in enumerate(seq_lens):
+        mask[i][:seq_len] = 1
+
+    return mask.float()
+
 class Dataset(object):
 
     def __init__(self, data: dict, batch_size, cuda, volatile=False):
@@ -71,17 +78,15 @@ class Dataset(object):
             b = b.contiguous()
             if self.cuda:
                 b = b.cuda()
-            b = Variable(b, volatile=self.volatile)
+            b = Variable(b, volatile=self.volatile, requires_grad=False)
             return b
 
         doc_lengths = torch.LongTensor(doc_lengths)
-
+        doc_mask = create_mask(doc_lengths)
         q_lengths = torch.LongTensor(q_lengths)
-        if self.cuda:
-            doc_lengths.cuda()
-            q_lengths.cuda()
+        q_mask = create_mask(q_lengths)
 
-        return (wrap(documents), doc_lengths), (wrap(querys), q_lengths), wrap(answers), wrap(candidates)
+        return (wrap(documents), wrap(doc_lengths), wrap(doc_mask)), (wrap(querys), wrap(q_lengths), wrap(q_mask)), wrap(answers), wrap(candidates)
 
     def __len__(self):
         return self.numBatches

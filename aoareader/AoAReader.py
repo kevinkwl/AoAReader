@@ -4,12 +4,13 @@ from torch.autograd import Variable
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
 from torch.nn.utils.rnn import pack_padded_sequence as pack
 import torch.nn.functional as F
+import torch.nn.init as weigth_init
 from aoareader import Constants
 
 
 def sort_batch(data, seq_len):
     sorted_seq_len, sorted_idx = torch.sort(seq_len, dim=0, descending=True)
-    sorted_data = data[sorted_idx.cuda()]
+    sorted_data = data[sorted_idx.data]
     _, reverse_idx = torch.sort(sorted_idx, dim=0, descending=False)
     return sorted_data, sorted_seq_len.cuda(), reverse_idx.cuda()
 
@@ -70,15 +71,16 @@ class AoAReader(nn.Module):
 
         for weight in self.gru.parameters():
             if len(weight.size()) > 1:
-                nn.init.orthogonal(weight.data)
+                weigth_init.orthogonal(weight.data)
 
-
-    def forward(self, docs_input, docs_len, querys_input, querys_len, candidates=None, answers=None):
+    def forward(self, docs_input, docs_len, doc_mask,
+                      querys_input, querys_len, query_mask,
+                      candidates=None, answers=None):
         s_docs, s_docs_len, reverse_docs_idx = sort_batch(docs_input, docs_len)
         s_querys, s_querys_len, reverse_querys_idx = sort_batch(querys_input, querys_len)
 
-        docs_embedding = pack(self.embedding(s_docs), list(s_docs_len), batch_first=True)
-        querys_embedding = pack(self.embedding(s_querys), list(s_querys_len), batch_first=True)
+        docs_embedding = pack(self.embedding(s_docs), list(s_docs_len.data), batch_first=True)
+        querys_embedding = pack(self.embedding(s_querys), list(s_querys_len.data), batch_first=True)
 
         # encode
         docs_outputs, _ = self.gru(docs_embedding, None)
@@ -88,15 +90,15 @@ class AoAReader(nn.Module):
         docs_outputs, _ = unpack(docs_outputs, batch_first=True)
         querys_outputs, _ = unpack(querys_outputs, batch_first=True)
 
-        docs_outputs = docs_outputs[reverse_docs_idx]
-        querys_outputs = querys_outputs[reverse_querys_idx]
+        docs_outputs = docs_outputs[reverse_docs_idx.data]
+        querys_outputs = querys_outputs[reverse_querys_idx.data]
 
 
         # transpose query for pair-wise dot product
         dos = docs_outputs
-        doc_mask = create_mask(docs_len, dos.size(0)).unsqueeze(2)
+        doc_mask = doc_mask.unsqueeze(2)
         qos = torch.transpose(querys_outputs, 1, 2)
-        query_mask = create_mask(querys_len, qos.size(0)).unsqueeze(2)
+        query_mask = query_mask.unsqueeze(2)
 
         # pair-wise matching score
         M = torch.bmm(dos, qos)
@@ -109,15 +111,17 @@ class AoAReader(nn.Module):
         sum_beta = torch.sum(beta, dim=1)
 
         docs_len = docs_len.unsqueeze(1).unsqueeze(2).expand_as(sum_beta)
-        average_beta = sum_beta / Variable(docs_len.float()).cuda()
+        average_beta = sum_beta / docs_len.float()
 
 
         # attended document-level attention
         s = torch.bmm(alpha, average_beta.transpose(1, 2))
 
         # predict the most possible answer from given candidates, return the idx of predict
+        pred_answers = None
+        probs = None
         if candidates is not None:
-            prob = []
+            pred_answers = []
             for i, cands in enumerate(candidates):
                 pb = []
                 document = docs_input[i].squeeze()
@@ -126,18 +130,19 @@ class AoAReader(nn.Module):
                     pb.append(torch.sum(s[i][pointer]))
                 pb = torch.cat(pb, dim=0).squeeze()
                 _ , max_loc = torch.max(pb, 0)
-                prob.append(cands.index_select(0, max_loc))
-            prob = torch.cat(prob, dim=0)
-            return prob
+                pred_answers.append(cands.index_select(0, max_loc))
+            pred_answers = torch.cat(pred_answers, dim=0).squeeze()
 
         if answers is not None:
-            prob = []
+            probs = []
             for i, answer in enumerate(answers):
                 document = docs_input[i].squeeze()
                 pointer = document == answer.expand_as(document)
-                prob.append(torch.sum(s[i][pointer]))
-            return torch.cat(prob, 0)
-        return s
+                probs.append(torch.sum(s[i][pointer]))
+            probs = torch.cat(probs, 0).squeeze()
+
+        return pred_answers, probs
+
 
 
 
