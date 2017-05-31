@@ -15,27 +15,6 @@ def sort_batch(data, seq_len):
     return sorted_data, sorted_seq_len.cuda(), reverse_idx.cuda()
 
 
-# From https://discuss.pytorch.org/t/why-softmax-function-cant-specify-the-dimension-to-operate/2637
-def softmax(input, axis=1):
-    input_size = input.size()
-
-    trans_input = input.transpose(axis, len(input_size) - 1)
-    trans_size = trans_input.size()
-
-    input_2d = trans_input.contiguous().view(-1, trans_size[-1])
-
-    soft_max_2d = F.softmax(input_2d)
-
-    soft_max_nd = soft_max_2d.view(*trans_size)
-    return soft_max_nd.transpose(axis, len(input_size) - 1)
-
-
-def create_mask(seq_lens, batch_size):
-    mask = torch.zeros(batch_size, torch.max(seq_lens))
-    for i, seq_len in enumerate(seq_lens):
-        mask[i][:seq_len] = 1
-
-    return Variable(mask.float(), requires_grad=False).cuda()
 
 
 def softmax_mask(input, mask, axis=1, epsilon=1e-12):

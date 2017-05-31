@@ -66,64 +66,11 @@ if opt.gpu:
     torch.cuda.set_device(opt.gpu)
 
 
-
-# data = torch.load(data_file)
-#
-# vocab_dict = data['dict']
-# train_data = data['train']
-# valid_data = data['valid']
-#
-# valid_dataset = reader.Dataset(valid_data, 32, False)
-# train_dataset = reader.Dataset(train_data, 32, True)
-# model = reader.AoAReader(vocab_dict, 0.1, 384, 384)
-#
-#
-#
-# if torch.cuda.is_available():
-#     model.cuda()
-#
-# optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.0001)
-#
-# nParams = sum([p.nelement() for p in model.parameters()])
-# print('* number of parameters: %d' % nParams)
-
-
 def loss_func(answers, pred_answers, answer_probs):
     num_correct = (answers == pred_answers).sum().squeeze().data[0]
     loss = - torch.mean(torch.log(answer_probs))
     return loss.cuda(), num_correct
-'''
-def train():
-    def trainEpoch():
-        for i in range(len(train_dataset)):
-            (docs, docs_len, doc_mask), (querys, querys_len, query_mask), answers, candidates = train_dataset[i]
 
-            pred_answers, answer_prob = model(docs, docs_len, doc_mask, querys, querys_len, query_mask, answers=answers, candidates=candidates)
-
-            loss, num_correct = loss_func(answers, pred_answers, answer_prob)
-            loss.cuda()
-
-            print(loss.data[0])
-
-            optimizer.zero_grad()
-            loss.backward()
-
-            for parameter in model.parameters():
-                parameter.grad.data.clamp_(-5.0, 5.0)
-            optimizer.step()
-
-    for i in range(2):
-        trainEpoch()
-train()
-
-import time
-
-def loss_func(answers, pred_answers, answer_probs):
-    #num_correct = (answers == pred_answers).sum().squeeze().data[0]
-    num_correct = 0
-    loss = - torch.mean(torch.log(answer_probs))
-    return loss.cuda(), num_correct
-'''
 def eval(model, data):
     total_loss = 0
     total = 0
@@ -155,6 +102,7 @@ def trainModel(model, trainData, validData, optimizer: torch.optim.Adam):
     start_time = time.time()
 
     def trainEpoch(epoch):
+        trainData.shuffle()
 
         total_loss, total, total_num_correct = 0, 0, 0
         report_loss, report_total, report_num_correct = 0, 0, 0
