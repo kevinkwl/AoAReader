@@ -20,8 +20,7 @@ class Dict:
 
     def convert2word(self, idxs):
         vec = [self.getWord(idx) for idx in idxs]
-
-        return torch.LongTensor(vec)
+        return vec
 
     def size(self):
         return len(self.idx2word)

@@ -16,20 +16,23 @@ from aoareader.Dict import Dict as Vocabulary
 
 from nltk.tokenize import word_tokenize
 
+from sys import argv
+
 data_path = 'data/'
 data_filenames = {
         'train': 'train.txt',
         'valid': 'dev.txt'
         }
-preprocessed = os.path.join(data_path, 'preprocessed.pt')
+preprocessed = os.path.join(data_path, argv[1])
 vocab_file = os.path.join(data_path, 'vocab.json')
 
+dict_file = os.path.join(data_path, 'dict.pt')
 
 def tokenize(sentence):
-    return [s.strip() for s in word_tokenize(sentence) if s.strip()]
+    return [s.strip().lower() for s in word_tokenize(sentence) if s.strip()]
 
 
-def parse_stories(lines):
+def parse_stories(lines, with_answer=True):
     stories = []
     story = []
     for line in lines:
@@ -40,19 +43,22 @@ def parse_stories(lines):
             _, line = line.split(' ', 1)
             if line:
                 if '\t' in line:  # query line
-                    q, a, _, answers = line.split('\t')
+                    answer = ''
+                    if with_answer:
+                        q, answer, _, candidates = line.split('\t')
+                        answer = answer.lower()
                     q = tokenize(q)
 
                     # use the first 10
-                    candidates = answers.split('|')[:10]
-                    stories.append((story, q, a, candidates))
+                    candidates = [cand.lower() for cand in candidates.split('|')[:10]]
+                    stories.append((story, q, answer, candidates))
                 else:
                     story.append(tokenize(line))
     return stories
 
 
-def get_stories(story_lines):
-    stories = parse_stories(story_lines)
+def get_stories(story_lines, with_answer=True):
+    stories = parse_stories(story_lines, with_answer=with_answer)
     flatten = lambda story: reduce(lambda x, y: x + y, story)
     stories = [(flatten(story), q, a, candidates) for story, q, a, candidates in stories]
     return stories
@@ -128,6 +134,7 @@ def main():
                  'train': train,
                  'valid': valid}
     torch.save(save_data, preprocessed)
+    torch.save(vocab_dict, dict_file)
 
 if __name__ == '__main__':
     main()
