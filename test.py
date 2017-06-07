@@ -24,41 +24,43 @@ parser.add_argument('-model', required=True, help='path to the saved model.')
 testopt = parser.parse_args()
 print(testopt)
 
-def load_testdata(testfile, vocab_dict):
+def load_testdata(testfile, vocab_dict, with_answer=True):
     if os.path.exists(testfile + '.pt'):
         return torch.load(testfile + '.pt')
     else:
         testd = {}
         with open(testfile, 'r') as tf:
             tlines = tf.readlines()
-            test_stories = get_stories(tlines, with_answer=False)
-            testd['documents'], testd['querys'], _, testd['candidates'] = vectorize_stories(test_stories, vocab_dict)
+            test_stories = get_stories(tlines, with_answer=with_answer)
+            testd['documents'], testd['querys'], testd['answers'], testd['candidates'] = vectorize_stories(test_stories, vocab_dict)
         torch.save(testd, testfile + '.pt')
         return testd
 
-
+from aoareader import Constants
 def evalulate(model, data, vocab_dict):
     model.eval()
     answers = []
-    for i in range(len(data)):
-        (batch_docs, batch_docs_len, doc_mask), (batch_querys, batch_querys_len, query_mask), _ , candidates = data[i]
+    ans_locs = []
 
-        pred_answers, _ = model(batch_docs, batch_docs_len, doc_mask,
+    for i in range(len(data)):
+        (batch_docs, batch_docs_len, doc_mask), (batch_querys, batch_querys_len, query_mask), batch_answers , candidates = data[i]
+
+        pred_answers, pred_locs, _ = model(batch_docs, batch_docs_len, doc_mask,
                                     batch_querys, batch_querys_len, query_mask,
                                     candidates=candidates)
 
         answers.extend(pred_answers.data)
-
+        ans_locs.extend(pred_locs.data)
 
     model.train()
-    return vocab_dict.convert2word(answers)
+    return vocab_dict.convert2word(answers), ans_locs
 
 def main():
     print("Loading dict", testopt.dict)
     vocab_dict = torch.load(testopt.dict)
 
     print("Loading test data and vectorizing data")
-    test_data = load_testdata(testopt.testdata, vocab_dict)
+    test_data = load_testdata(testopt.testdata, vocab_dict, with_answer=True)
 
     print("Loading model from ", testopt.model)
     ckp = torch.load(testopt.model)
@@ -84,10 +86,12 @@ def main():
     model.load_state_dict(model_state)
 
     print('Evaluate on test data')
-    answers = evalulate(model, test_dataset, vocab_dict)
+    answers, locs = evalulate(model, test_dataset, vocab_dict)
 
     with open(testopt.out, 'w') as out:
         print('\n'.join(answers), file=out)
+    with open(testopt.out + '.idx', 'w') as of:
+        print('\n'.join([str(loc) for loc in locs]), file=of)
 
 if __name__ == '__main__':
     main()

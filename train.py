@@ -80,7 +80,7 @@ def eval(model, data):
     for i in range(len(data)):
         (batch_docs, batch_docs_len, doc_mask), (batch_querys, batch_querys_len, query_mask), batch_answers, candidates = data[i]
 
-        pred_answers, probs = model(batch_docs, batch_docs_len, doc_mask,
+        pred_answers, _, probs = model(batch_docs, batch_docs_len, doc_mask,
                                     batch_querys, batch_querys_len, query_mask,
                                     answers=batch_answers, candidates=candidates)
 
@@ -110,7 +110,7 @@ def trainModel(model, trainData, validData, optimizer: torch.optim.Adam):
             (batch_docs, batch_docs_len, doc_mask), (batch_querys, batch_querys_len, query_mask), batch_answers, candidates = trainData[i]
 
             model.zero_grad()
-            pred_answers, answer_probs = model(batch_docs, batch_docs_len, doc_mask, batch_querys, batch_querys_len, query_mask,answers=batch_answers, candidates=candidates)
+            pred_answers, _, answer_probs = model(batch_docs, batch_docs_len, doc_mask, batch_querys, batch_querys_len, query_mask,answers=batch_answers, candidates=candidates)
 
             loss, num_correct = loss_func(batch_answers, pred_answers, answer_probs)
 
@@ -188,12 +188,18 @@ def main():
 
     print('Building model...')
 
+    if opt.train_from:
+        checkpoint = torch.load(opt.train_from)
+        trainopt = checkpoint['opt']
+        opt.dropout = trainopt.dropout
+        opt.embed_size = trainopt.embed_size
+        opt.gru_size = trainopt.gru_size
+
     model = reader.AoAReader(vocab_dict, dropout_rate=opt.dropout, embed_dim=opt.embed_size, hidden_dim=opt.gru_size)
     # no way on CPU
     model.cuda()
 
     if opt.train_from:
-        checkpoint = torch.load(opt.train_from)
         print('Loading model from checkpoint at %s' % opt.train_from)
         chk_model = checkpoint['model']
         model.load_state_dict(chk_model)

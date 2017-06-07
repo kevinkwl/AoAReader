@@ -48,6 +48,10 @@ class AoAReader(nn.Module):
         self.gru = nn.GRU(input_size, hidden_size=self.hidden_dim, dropout=dropout_rate,
                           bidirectional=bidirectional, batch_first=True)
 
+        # try independent gru
+        #self.query_gru = nn.GRU(input_size, hidden_size=self.hidden_dim, dropout=dropout_rate,
+        #                 bidirectional=bidirectional, batch_first=True)
+
         for weight in self.gru.parameters():
             if len(weight.size()) > 1:
                 weigth_init.orthogonal(weight.data)
@@ -98,9 +102,11 @@ class AoAReader(nn.Module):
 
         # predict the most possible answer from given candidates, return the idx of predict
         pred_answers = None
+        pred_locs = None
         probs = None
         if candidates is not None:
             pred_answers = []
+            pred_locs = []
             for i, cands in enumerate(candidates):
                 pb = []
                 document = docs_input[i].squeeze()
@@ -110,7 +116,9 @@ class AoAReader(nn.Module):
                 pb = torch.cat(pb, dim=0).squeeze()
                 _ , max_loc = torch.max(pb, 0)
                 pred_answers.append(cands.index_select(0, max_loc))
+                pred_locs.append(max_loc)
             pred_answers = torch.cat(pred_answers, dim=0).squeeze()
+            pred_locs = torch.cat(pred_locs, dim=0).squeeze()
 
         if answers is not None:
             probs = []
@@ -120,7 +128,7 @@ class AoAReader(nn.Module):
                 probs.append(torch.sum(s[i][pointer]))
             probs = torch.cat(probs, 0).squeeze()
 
-        return pred_answers, probs
+        return pred_answers, pred_locs, probs
 
 
 

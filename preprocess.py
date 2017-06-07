@@ -21,7 +21,7 @@ from sys import argv
 data_path = 'data/'
 data_filenames = {
         'train': 'train.txt',
-        'valid': 'dev.txt'
+        'valid': 'dev.txt',
         }
 preprocessed = os.path.join(data_path, argv[1])
 vocab_file = os.path.join(data_path, 'vocab.json')
@@ -47,6 +47,8 @@ def parse_stories(lines, with_answer=True):
                     if with_answer:
                         q, answer, _, candidates = line.split('\t')
                         answer = answer.lower()
+                    else:
+                        q, _, candidates = line.split('\t')
                     q = tokenize(q)
 
                     # use the first 10
@@ -111,11 +113,13 @@ def main():
     print('Preparing process dataset ...')
     train_filename = os.path.join(data_path, data_filenames['train'])
     valid_filename = os.path.join(data_path, data_filenames['valid'])
+
     with open(train_filename, 'r') as tf, open(valid_filename, 'r') as vf:
         tlines = tf.readlines()
         vlines = vf.readlines()
         train_stories, valid_stories = Parallel(n_jobs=2)(delayed(get_stories)(story_lines)
                                                           for story_lines in [tlines, vlines])
+
 
     print('Preparing build dictionary ...')
     vocab_dict = build_dict(train_stories + valid_stories)
