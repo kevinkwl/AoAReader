@@ -22,10 +22,9 @@ data_path = 'data/'
 data_filenames = {
         'train': 'train.txt',
         'valid': 'dev.txt',
+        'test': 'test.txt'
         }
-preprocessed = os.path.join(data_path, argv[1])
 vocab_file = os.path.join(data_path, 'vocab.json')
-
 dict_file = os.path.join(data_path, 'dict.pt')
 
 def tokenize(sentence):
@@ -113,32 +112,37 @@ def main():
     print('Preparing process dataset ...')
     train_filename = os.path.join(data_path, data_filenames['train'])
     valid_filename = os.path.join(data_path, data_filenames['valid'])
+    test_filename = os.path.join(data_path, data_filenames['test'])
 
-    with open(train_filename, 'r') as tf, open(valid_filename, 'r') as vf:
+
+    with open(train_filename, 'r') as tf, open(valid_filename, 'r') as vf, open(test_filename, 'r') as tef:
         tlines = tf.readlines()
         vlines = vf.readlines()
-        train_stories, valid_stories = Parallel(n_jobs=2)(delayed(get_stories)(story_lines)
-                                                          for story_lines in [tlines, vlines])
+        telines = tef.readlines()
+        train_stories, valid_stories, test_stories = Parallel(n_jobs=2)(delayed(get_stories)(story_lines)
+                                                          for story_lines in [tlines, vlines, telines])
 
 
     print('Preparing build dictionary ...')
-    vocab_dict = build_dict(train_stories + valid_stories)
+    vocab_dict = build_dict(train_stories + valid_stories + test_stories)
 
     print('Preparing training and validation ...')
     train = {}
     valid = {}
+    test = {}
 
-    train_data, valid_data = Parallel(n_jobs=2)(delayed(vectorize_stories)(stories, vocab_dict)
+    train_data, valid_data, test_data = Parallel(n_jobs=2)(delayed(vectorize_stories)(stories, vocab_dict)
                                                 for stories in [train_stories, valid_stories])
     train['documents'], train['querys'], train['answers'], train['candidates'] = train_data
     valid['documents'], valid['querys'], valid['answers'], valid['candidates'] = valid_data
+    test['documents'], test['querys'], test['answers'], test['candidates'] = test_data
 
-    print('Saving data to \'' + preprocessed + '\'...')
-    save_data = {'dict': vocab_dict,
-                 'train': train,
-                 'valid': valid}
-    torch.save(save_data, preprocessed)
+
+    print('Saving data to \'' + data_path + '\'...')
     torch.save(vocab_dict, dict_file)
+    torch.save(train, train_filename + '.pt')
+    torch.save(valid, valid_filename + '.pt')
+    torch.save(test, test_filename + '.pt')
 
 if __name__ == '__main__':
     main()

@@ -100,9 +100,9 @@ class AoAReader(nn.Module):
         # attended document-level attention
         s = torch.bmm(alpha, average_beta.transpose(1, 2))
 
-        # predict the most possible answer from given candidates, return the idx of predict
+        # predict the most possible answer from given candidates
         pred_answers = None
-        pred_locs = None
+        #pred_locs = None
         probs = None
         if candidates is not None:
             pred_answers = []
@@ -118,7 +118,7 @@ class AoAReader(nn.Module):
                 pred_answers.append(cands.index_select(0, max_loc))
                 pred_locs.append(max_loc)
             pred_answers = torch.cat(pred_answers, dim=0).squeeze()
-            pred_locs = torch.cat(pred_locs, dim=0).squeeze()
+            #pred_locs = torch.cat(pred_locs, dim=0).squeeze()
 
         if answers is not None:
             probs = []
@@ -128,7 +128,7 @@ class AoAReader(nn.Module):
                 probs.append(torch.sum(s[i][pointer]))
             probs = torch.cat(probs, 0).squeeze()
 
-        return pred_answers, pred_locs, probs
+        return pred_answers, probs
 
 
 

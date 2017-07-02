@@ -9,8 +9,12 @@ parser = argparse.ArgumentParser(description="train.py")
 
 # train options
 
-parser.add_argument('-data', default='data/preprocessed.pt',
-                    help='Path to the *-train.pt file from preprocess.py, default value is \'data/preprocessed.pt\'')
+parser.add_argument('-traindata', default='data/train.txt.pt',
+                    help='Path to the *-train.pt file from preprocess.py, default value is \'data/train.txt.pt\'')
+parser.add_argument('-validdata', default='data/valid.txt.pt',
+                    help='Path to the *-dev.pt file from preprocess.py, default value is \'data/dev.txt.pt\'')
+parser.add_argument('-dict', default='data/dict.pt',
+                    help='Path to the dictionary file from preprocess.py, default value is \'data/dict.pt\'')
 parser.add_argument('-save_model', default='model',
                     help="""Model filename (the model will be saved as
                     <save_model>_epochN_ACC.pt to 'models/' directory, where ACC is the
@@ -80,7 +84,7 @@ def eval(model, data):
     for i in range(len(data)):
         (batch_docs, batch_docs_len, doc_mask), (batch_querys, batch_querys_len, query_mask), batch_answers, candidates = data[i]
 
-        pred_answers, _, probs = model(batch_docs, batch_docs_len, doc_mask,
+        pred_answers, probs = model(batch_docs, batch_docs_len, doc_mask,
                                     batch_querys, batch_querys_len, query_mask,
                                     answers=batch_answers, candidates=candidates)
 
@@ -110,7 +114,7 @@ def trainModel(model, trainData, validData, optimizer: torch.optim.Adam):
             (batch_docs, batch_docs_len, doc_mask), (batch_querys, batch_querys_len, query_mask), batch_answers, candidates = trainData[i]
 
             model.zero_grad()
-            pred_answers, _, answer_probs = model(batch_docs, batch_docs_len, doc_mask, batch_querys, batch_querys_len, query_mask,answers=batch_answers, candidates=candidates)
+            pred_answers, answer_probs = model(batch_docs, batch_docs_len, doc_mask, batch_querys, batch_querys_len, query_mask,answers=batch_answers, candidates=candidates)
 
             loss, num_correct = loss_func(batch_answers, pred_answers, answer_probs)
 
@@ -129,7 +133,7 @@ def trainModel(model, trainData, validData, optimizer: torch.optim.Adam):
             total_loss += loss.data[0] * total_in_minibatch
             total_num_correct += num_correct
             total += total_in_minibatch
-            if i % 50 == 0:
+            if i % opt.log_interval == 0:
                 print("Epoch %2d, %5d/%5d; avg loss: %.2f; acc: %6.2f;  %6.0f s elapsed" %
                       (epoch, i+1, len(trainData),
                        report_loss / report_total,
@@ -169,13 +173,20 @@ def trainModel(model, trainData, validData, optimizer: torch.optim.Adam):
                    'models/%s_epoch%d_acc_%.2f.pt' % (opt.save_model, epoch, 100*valid_acc))
 
 def main():
+    global opt
+    train_from = opt.train_from
+    if opt.train_from:
+        train_from = True
+        checkpoint = torch.load(opt.train_from)
+        opt = checkpoint['opt']
 
-    print("Loading data from ", opt.data)
-    data = torch.load(opt.data)
 
-    vocab_dict = data['dict']
-    train_data = data['train']
-    valid_data = data['valid']
+    print("Loading dictrionary from ", opt.dict)
+    vocab_dict = torch.load(opt.dict)
+    print("Loading train data from ", opt.traindata)
+    train_data = torch.load(opt.data)
+    print("Loading valid data from ", opt.validdata)
+    valid_data = torch.load(opt.validdata)
 
     train_dataset = reader.Dataset(train_data, opt.batch_size, opt.gpu)
     valid_dataset = reader.Dataset(valid_data, opt.batch_size, opt.gpu, volatile=True)
@@ -183,23 +194,16 @@ def main():
     print(' * vocabulary size = %d' %
           (vocab_dict.size()))
     print(' * number of training samples. %d' %
-          len(data['train']['answers']))
+          len(train_data['answers']))
     print(' * maximum batch size. %d' % opt.batch_size)
 
     print('Building model...')
-
-    if opt.train_from:
-        checkpoint = torch.load(opt.train_from)
-        trainopt = checkpoint['opt']
-        opt.dropout = trainopt.dropout
-        opt.embed_size = trainopt.embed_size
-        opt.gru_size = trainopt.gru_size
 
     model = reader.AoAReader(vocab_dict, dropout_rate=opt.dropout, embed_dim=opt.embed_size, hidden_dim=opt.gru_size)
     # no way on CPU
     model.cuda()
 
-    if opt.train_from:
+    if train_from:
         print('Loading model from checkpoint at %s' % opt.train_from)
         chk_model = checkpoint['model']
         model.load_state_dict(chk_model)
@@ -207,7 +211,7 @@ def main():
 
     optimizer = torch.optim.Adam(model.parameters(), lr=opt.learning_rate, weight_decay=opt.weight_decay)
 
-    if opt.train_from:
+    if train_from:
         optimizer.load_state_dict(checkpoint['optimizer'])
 
     nParams = sum([p.nelement() for p in model.parameters()])
