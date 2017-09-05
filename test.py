@@ -24,6 +24,9 @@ parser.add_argument('-model', required=True, help='path to the saved model.')
 testopt = parser.parse_args()
 print(testopt)
 
+if opt.gpu:
+    torch.cuda.set_device(opt.gpu)
+
 def load_testdata(testfile, vocab_dict, with_answer=True):
     if os.path.exists(testfile + '.pt'):
         return torch.load(testfile + '.pt')
@@ -77,7 +80,7 @@ def main():
     opt = ckp['opt']
     model_state = ckp['model']
 
-    test_dataset = reader.Dataset(test_data, opt.batch_size, opt.gpu, volatile=True)
+    test_dataset = reader.Dataset(test_data, opt.batch_size, True, volatile=True)
 
     print(' * vocabulary size = %d' %
           (vocab_dict.size()))

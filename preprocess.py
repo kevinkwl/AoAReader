@@ -126,13 +126,13 @@ def main():
     print('Preparing build dictionary ...')
     vocab_dict = build_dict(train_stories + valid_stories + test_stories)
 
-    print('Preparing training and validation ...')
+    print('Preparing training, validation, testing ...')
     train = {}
     valid = {}
     test = {}
 
     train_data, valid_data, test_data = Parallel(n_jobs=2)(delayed(vectorize_stories)(stories, vocab_dict)
-                                                for stories in [train_stories, valid_stories])
+                                                for stories in [train_stories, valid_stories, test_stories])
     train['documents'], train['querys'], train['answers'], train['candidates'] = train_data
     valid['documents'], valid['querys'], valid['answers'], valid['candidates'] = valid_data
     test['documents'], test['querys'], test['answers'], test['candidates'] = test_data

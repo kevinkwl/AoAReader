@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(description="train.py")
 
 parser.add_argument('-traindata', default='data/train.txt.pt',
                     help='Path to the *-train.pt file from preprocess.py, default value is \'data/train.txt.pt\'')
-parser.add_argument('-validdata', default='data/valid.txt.pt',
+parser.add_argument('-validdata', default='data/dev.txt.pt',
                     help='Path to the *-dev.pt file from preprocess.py, default value is \'data/dev.txt.pt\'')
 parser.add_argument('-dict', default='data/dict.pt',
                     help='Path to the dictionary file from preprocess.py, default value is \'data/dict.pt\'')
@@ -184,12 +184,12 @@ def main():
     print("Loading dictrionary from ", opt.dict)
     vocab_dict = torch.load(opt.dict)
     print("Loading train data from ", opt.traindata)
-    train_data = torch.load(opt.data)
+    train_data = torch.load(opt.traindata)
     print("Loading valid data from ", opt.validdata)
     valid_data = torch.load(opt.validdata)
 
-    train_dataset = reader.Dataset(train_data, opt.batch_size, opt.gpu)
-    valid_dataset = reader.Dataset(valid_data, opt.batch_size, opt.gpu, volatile=True)
+    train_dataset = reader.Dataset(train_data, opt.batch_size, True)
+    valid_dataset = reader.Dataset(valid_data, opt.batch_size, True, volatile=True)
 
     print(' * vocabulary size = %d' %
           (vocab_dict.size()))
