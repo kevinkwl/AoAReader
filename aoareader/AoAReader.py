@@ -18,12 +18,12 @@ def sort_batch(data, seq_len):
 
 
 def softmax_mask(input, mask, axis=1, epsilon=1e-12):
-    shift, _ = torch.max(input, axis)
+    shift, _ = torch.max(input, axis, keepdim=True)
     shift = shift.expand_as(input).cuda()
 
     target_exp = torch.exp(input - shift) * mask
 
-    normalize = torch.sum(target_exp, axis).expand_as(target_exp)
+    normalize = torch.sum(target_exp, axis, keepdim=True).expand_as(target_exp)
     softm = target_exp / (normalize + epsilon)
 
 
@@ -86,12 +86,11 @@ class AoAReader(nn.Module):
         # pair-wise matching score
         M = torch.bmm(dos, qos)
         M_mask = torch.bmm(doc_mask, query_mask.transpose(1, 2))
-
         # query-document attention
         alpha = softmax_mask(M, M_mask, axis=1)
         beta = softmax_mask(M, M_mask, axis=2)
 
-        sum_beta = torch.sum(beta, dim=1)
+        sum_beta = torch.sum(beta, dim=1, keepdim=True)
 
         docs_len = docs_len.unsqueeze(1).unsqueeze(2).expand_as(sum_beta)
         average_beta = sum_beta / docs_len.float()
@@ -112,12 +111,12 @@ class AoAReader(nn.Module):
                 document = docs_input[i].squeeze()
                 for j, candidate in enumerate(cands):
                     pointer = document == candidate.expand_as(document)
-                    pb.append(torch.sum(s[i][pointer]))
+                    pb.append(torch.sum(s[i][pointer], keepdim=True))
                 pb = torch.cat(pb, dim=0).squeeze()
                 _ , max_loc = torch.max(pb, 0)
                 pred_answers.append(cands.index_select(0, max_loc))
                 pred_locs.append(max_loc)
-            pred_answers = torch.cat(pred_answers, dim=0).squeeze()
+            pred_answers = torch.cat(pred_answers, dim=0 ).squeeze()
             #pred_locs = torch.cat(pred_locs, dim=0).squeeze()
 
         if answers is not None:
@@ -125,7 +124,7 @@ class AoAReader(nn.Module):
             for i, answer in enumerate(answers):
                 document = docs_input[i].squeeze()
                 pointer = document == answer.expand_as(document)
-                probs.append(torch.sum(s[i][pointer]))
+                probs.append(torch.sum(s[i][pointer], keepdim=True))
             probs = torch.cat(probs, 0).squeeze()
 
         return pred_answers, probs
