@@ -72,7 +72,7 @@ if opt.gpu:
 
 def loss_func(answers, pred_answers, answer_probs):
     num_correct = (answers == pred_answers).sum().squeeze().data[0]
-    loss = - torch.mean(torch.log(answer_probs))
+    loss = - torch.mean(torch.log(answer_probs), keepdim=True)
     return loss.cuda(), num_correct
 
 def eval(model, data):
