@@ -9,11 +9,11 @@ from preprocess import get_stories, vectorize_stories
 
 parser = argparse.ArgumentParser(description="test.py")
 
-parser.add_argument('-testdata', required=True,
+parser.add_argument('-testdata', default='data/test.txt.pt',
                     help='Path to the test.txt.pt, test.txt.pt will be used if exists.')
 
-parser.add_argument('-dict', required=True,
-                    help='Path to the dictionary file (Vocabulary class)')
+parser.add_argument('-dict', default="data/dict.pt",
+                    help='Path to the dictionary file, default value: data/dict.pt')
 
 parser.add_argument('-out', default='data/result.txt',
                     help='output file name.')
@@ -24,8 +24,6 @@ parser.add_argument('-model', required=True, help='path to the saved model.')
 testopt = parser.parse_args()
 print(testopt)
 
-if opt.gpu:
-    torch.cuda.set_device(opt.gpu)
 
 def load_testdata(testfile, vocab_dict, with_answer=True):
     if os.path.exists(testfile + '.pt'):
@@ -79,6 +77,9 @@ def main():
 
     opt = ckp['opt']
     model_state = ckp['model']
+
+    if opt.gpu:
+        torch.cuda.set_device(opt.gpu)
 
     test_dataset = reader.Dataset(test_data, opt.batch_size, True, volatile=True)
 

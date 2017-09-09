@@ -26,7 +26,6 @@ def softmax_mask(input, mask, axis=1, epsilon=1e-12):
     normalize = torch.sum(target_exp, axis, keepdim=True).expand_as(target_exp)
     softm = target_exp / (normalize + epsilon)
 
-
     return softm.cuda()
 
 
@@ -98,7 +97,6 @@ class AoAReader(nn.Module):
 
         # attended document-level attention
         s = torch.bmm(alpha, average_beta.transpose(1, 2))
-
         # predict the most possible answer from given candidates
         pred_answers = None
         #pred_locs = None
@@ -111,12 +109,12 @@ class AoAReader(nn.Module):
                 document = docs_input[i].squeeze()
                 for j, candidate in enumerate(cands):
                     pointer = document == candidate.expand_as(document)
-                    pb.append(torch.sum(s[i][pointer], keepdim=True))
+                    pb.append(torch.sum(torch.masked_select(s[i].squeeze(), pointer), keepdim=True))
                 pb = torch.cat(pb, dim=0).squeeze()
                 _ , max_loc = torch.max(pb, 0)
                 pred_answers.append(cands.index_select(0, max_loc))
                 pred_locs.append(max_loc)
-            pred_answers = torch.cat(pred_answers, dim=0 ).squeeze()
+            pred_answers = torch.cat(pred_answers, dim=0).squeeze()
             #pred_locs = torch.cat(pred_locs, dim=0).squeeze()
 
         if answers is not None:
@@ -124,7 +122,8 @@ class AoAReader(nn.Module):
             for i, answer in enumerate(answers):
                 document = docs_input[i].squeeze()
                 pointer = document == answer.expand_as(document)
-                probs.append(torch.sum(s[i][pointer], keepdim=True))
+                this_prob = torch.sum(torch.masked_select(s[i].squeeze(), pointer))
+                probs.append(this_prob)
             probs = torch.cat(probs, 0).squeeze()
 
         return pred_answers, probs
